@@ -7,6 +7,12 @@ import pandas as pd
 import streamlit as st
 from dateutil.relativedelta import relativedelta
 
+# --- Initialize session state ---
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
+if "expenses" not in st.session_state:
+    st.session_state.expenses = []
+
 # --- Constants ---
 USERS_FILE = "users.json"
 
@@ -79,6 +85,7 @@ if mode == "Sign Up":
             success, msg = sign_up(username, password, name)
             if success:
                 st.success(msg)
+                st.session_state.current_user = username  # <--- add this
             else:
                 st.error(msg)
 
@@ -89,12 +96,14 @@ elif mode == "Login":
         success, user_data = authenticate(username, password)
         if success:
             st.success(f"Welcome {user_data['name']}!")
+            st.session_state.current_user = username
             current_user = username
         else:
             st.error("Invalid username or password")
 
 # --- Main App after Login ---
-if current_user:
+if st.session_state.current_user:
+    current_user = st.session_state.current_user
     users = load_users()
     user_data = users[current_user]
 
@@ -134,21 +143,36 @@ if current_user:
             st.session_state.expenses[i]["deadline"] = st.date_input(
                 "Deadline", value=goal["deadline"], key=f"deadline_{i}"
             )
+        # --- Deleting a goal ---
         with col4:
-            if st.button("Delete", key=f"delete_{i}"):
+            if st.button(f"Delete Goal {i + 1}", key=f"delete_{i}"):
                 st.session_state.expenses.pop(i)
-                st.experimental_rerun()
+                users[current_user]["expenses"] = st.session_state.expenses
+                save_users(users)  # Save immediately
+                st.experimental_rerun()  # Optional, to refresh UI
 
-    # Add new goal
+    # --- Adding a goal ---
     if st.button("Add New Goal"):
-        st.session_state.expenses.append({"name": "New Goal", "target": 0, "deadline": datetime.date.today()})
-        st.experimental_rerun()
+        st.session_state.expenses.append({
+            "name": "New Goal",
+            "target": 0,
+            "deadline": datetime.date.today()  # <-- must include deadline
+        })
+        users[current_user]["expenses"] = st.session_state.expenses
+        save_users(users)  # Save immediately
 
     # Save updated expenses
     users[current_user]["expenses"] = st.session_state.expenses
     save_users(users)
 
     # --- Compute Allocations ---
+    # --- Ensure deadlines exist and are proper datetime objects ---
+    for goal in st.session_state.expenses:
+        if "deadline" not in goal or not goal["deadline"]:
+            goal["deadline"] = datetime.date.today()
+        elif isinstance(goal["deadline"], str):
+            goal["deadline"] = datetime.datetime.strptime(goal["deadline"], "%m-%d-%Y").date()
+
     df = pd.DataFrame(st.session_state.expenses)
     df["deadline"] = pd.to_datetime(df["deadline"])
     df["days_until_deadline"] = (df["deadline"] - pd.to_datetime(pay_date)).dt.days
