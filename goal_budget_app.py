@@ -171,7 +171,7 @@ if st.session_state.current_user:
         if "deadline" not in goal or not goal["deadline"]:
             goal["deadline"] = datetime.date.today()
         elif isinstance(goal["deadline"], str):
-            goal["deadline"] = datetime.datetime.strptime(goal["deadline"], "%m-%d-%Y").date()
+            goal["deadline"] = datetime.datetime.strptime(goal["deadline"], "%Y-%m-%d").date()
 
     df = pd.DataFrame(st.session_state.expenses)
     df["deadline"] = pd.to_datetime(df["deadline"])
