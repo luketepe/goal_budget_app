@@ -18,7 +18,7 @@ USERS_FILE = "users.json"
 
 # --- User management functions ---
 def load_users():
-    """Load all users from JSON file and convert deadlines to dates."""
+    """Load all users from JSON file and convert deadlines to date objects."""
     if not os.path.exists(USERS_FILE):
         return {}
     try:
@@ -31,11 +31,14 @@ def load_users():
     for user_data in users.values():
         for exp in user_data.get("expenses", []):
             if isinstance(exp.get("deadline"), str):
-                exp["deadline"] = datetime.date.fromisoformat(exp["deadline"])
+                try:
+                    exp["deadline"] = datetime.date.fromisoformat(exp["deadline"])
+                except ValueError:
+                    exp["deadline"] = datetime.date.today()
     return users
 
 def save_users(users):
-    """Save users to JSON file, converting dates to strings."""
+    """Save users to JSON file, converting deadlines to strings."""
     users_copy = {}
     for username, data in users.items():
         users_copy[username] = data.copy()
@@ -71,7 +74,6 @@ st.title("Goal & Budget App")
 
 # --- Login / Sign Up ---
 mode = st.radio("Select mode", ["Login", "Sign Up"])
-current_user = None
 
 if mode == "Sign Up":
     name = st.text_input("Name")
@@ -85,7 +87,7 @@ if mode == "Sign Up":
             success, msg = sign_up(username, password, name)
             if success:
                 st.success(msg)
-                st.session_state.current_user = username  # <--- add this
+                st.session_state.current_user = username
             else:
                 st.error(msg)
 
@@ -97,7 +99,6 @@ elif mode == "Login":
         if success:
             st.success(f"Welcome {user_data['name']}!")
             st.session_state.current_user = username
-            current_user = username
         else:
             st.error("Invalid username or password")
 
@@ -121,7 +122,7 @@ if st.session_state.current_user:
         save_users(users)
 
     # Load expenses into session_state
-    if "expenses" not in st.session_state:
+    if not st.session_state.expenses:
         st.session_state.expenses = user_data["expenses"]
 
     # --- Paycheck Input ---
@@ -131,6 +132,22 @@ if st.session_state.current_user:
 
     # --- Editable Goals ---
     st.subheader("Your Expenses / Goals")
+
+    # Ensure every goal has proper keys
+    for goal in st.session_state.expenses:
+        if "deadline" not in goal or not goal["deadline"]:
+            goal["deadline"] = datetime.date.today()
+        if isinstance(goal["deadline"], str):
+            try:
+                goal["deadline"] = datetime.date.fromisoformat(goal["deadline"])
+            except ValueError:
+                goal["deadline"] = datetime.date.today()
+        if "name" not in goal:
+            goal["name"] = "Unnamed Goal"
+        if "target" not in goal:
+            goal["target"] = 0.0
+
+    # Display editable table with delete buttons
     for i, goal in enumerate(st.session_state.expenses):
         col1, col2, col3, col4 = st.columns([3,2,3,1])
         with col1:
@@ -143,36 +160,28 @@ if st.session_state.current_user:
             st.session_state.expenses[i]["deadline"] = st.date_input(
                 "Deadline", value=goal["deadline"], key=f"deadline_{i}"
             )
-        # --- Deleting a goal ---
         with col4:
-            if st.button(f"Delete Goal {i + 1}", key=f"delete_{i}"):
+            if st.button(f"Delete", key=f"delete_{i}"):
                 st.session_state.expenses.pop(i)
                 users[current_user]["expenses"] = st.session_state.expenses
-                save_users(users)  # Save immediately
-                st.experimental_rerun()  # Optional, to refresh UI
+                save_users(users)
+                st.experimental_rerun()
 
-    # --- Adding a goal ---
+    # Add new goal
     if st.button("Add New Goal"):
         st.session_state.expenses.append({
             "name": "New Goal",
-            "target": 0,
-            "deadline": datetime.date.today()  # <-- must include deadline
+            "target": 0.0,
+            "deadline": datetime.date.today()
         })
         users[current_user]["expenses"] = st.session_state.expenses
-        save_users(users)  # Save immediately
+        save_users(users)
 
     # Save updated expenses
     users[current_user]["expenses"] = st.session_state.expenses
     save_users(users)
 
     # --- Compute Allocations ---
-    # --- Ensure deadlines exist and are proper datetime objects ---
-    for goal in st.session_state.expenses:
-        if "deadline" not in goal or not goal["deadline"]:
-            goal["deadline"] = datetime.date.today()
-        elif isinstance(goal["deadline"], str):
-            goal["deadline"] = datetime.datetime.strptime(goal["deadline"], "%Y-%m-%d").date()
-
     df = pd.DataFrame(st.session_state.expenses)
     df["deadline"] = pd.to_datetime(df["deadline"])
     df["days_until_deadline"] = (df["deadline"] - pd.to_datetime(pay_date)).dt.days
