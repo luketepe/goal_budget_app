@@ -2,6 +2,37 @@
   "Tepe": {
     "name": "Lucas",
     "password": "$2b$12$RF/XvLNHcET7bhNVEMAssO5VKgVBp5ZA4o/ySleVgEvY5NZ7QS5zm",
-    "expenses": []
+    "expenses": [
+      {
+        "name": "Rent",
+        "target": 1200.0,
+        "deadline": "2025-09-30"
+      },
+      {
+        "name": "Utilities",
+        "target": 125.0,
+        "deadline": "2025-09-30"
+      },
+      {
+        "name": "Electric",
+        "target": 50.0,
+        "deadline": "2025-09-30"
+      },
+      {
+        "name": "Internet",
+        "target": 30.0,
+        "deadline": "2025-09-30"
+      },
+      {
+        "name": "Auto Insurance",
+        "target": 500.0,
+        "deadline": "2026-03-12"
+      },
+      {
+        "name": "Renters Insurance",
+        "target": 150.0,
+        "deadline": "2026-09-12"
+      }
+    ]
   }
 }
